@@ -15,42 +15,34 @@ runtime = []
 
 [dependencies]
 blockless-drivers-macro = {path = "macro"}
-wasmtime-wasi = {workspace = true}
-wiggle = {workspace = true}
-wasi-common = {workspace = true}
-anyhow = {workspace = true}
-cap-std = {workspace = true}
-log = {workspace = true}
-async-trait = {workspace = true}
-dlopen = {workspace = true}
-json = {workspace = true}
-reqwest = {version = "0.12.9", features = ["stream", "rustls-tls"], default-features = false}
+blockless-multiaddr = {path = "../blockless-multiaddr"}
+wasmtime-wasi = { workspace = true }
+wiggle = { workspace = true }
+wasi-common = { workspace = true }
+anyhow = { workspace = true }
+cap-std = { workspace = true }
+log = { workspace = true }
+async-trait = { workspace = true }
+dlopen = { workspace = true }
+json = { workspace = true }
+lazy_static = { workspace = true}
+reqwest = { version = "0.11", features = ["stream", "rustls-tls", "json"], default-features = false }
 serde_urlencoded = "0.7"
 bytes = { workspace = true }
 httparse = "1"
 url = { workspace = true }
-rust-s3 = {git = "https://github.com/Joinhack/rust-s3", features = ["tokio-rustls-tls"]}
-futures-core = {workspace = true}
-futures-util = {workspace = true}
+rust-s3 = { git = "https://github.com/Joinhack/rust-s3", features = ["tokio-rustls-tls"] }
+futures-core = { workspace = true }
+futures-util = { workspace = true }
 md5 = "0.7.0"
-
-[dependencies.rusqlite]
-version = "0.28"
-features = ["bundled"]
-
+rusqlite = { version = "0.28", features = ["bundled"] }
+serde_json = "1.0.138"
+serde = "1.0.217"
+tokio = { workspace = true, features = ["process"] }
+tracing = { workspace = true }
 
 [dev-dependencies]
-tempdir = {workspace = true}
+tempdir = { workspace = true }
 tokio-test = "0.4.2"
-
-
-[dependencies.lazy_static]
-workspace = true
-
-[dependencies.tokio]
-workspace = true
-features = ["net", "process", "fs"]
-
-
-[dependencies.blockless-multiaddr]
-path = "../blockless-multiaddr"
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }

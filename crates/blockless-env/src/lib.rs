@@ -42,3 +42,9 @@ linker_integration!({
     target: blockless_drivers::wasi::socket,
     link_method: "add_socket_to_linker",
 });
+
+linker_integration!({
+    witx: ["$BLOCKLESS_DRIVERS_ROOT/witx/blockless_llm.witx"],
+    target: blockless_drivers::wasi::llm,
+    link_method: "add_llm_to_linker",
+});

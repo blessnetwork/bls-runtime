@@ -3,6 +3,7 @@ pub mod cgi;
 pub mod guest_ptr;
 pub mod http;
 pub mod ipfs;
+pub mod llm;
 pub mod memory;
 pub mod s3;
 pub mod socket;

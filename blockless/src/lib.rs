@@ -654,6 +654,7 @@ impl BlocklessRunner {
         }
         add_to_linker!(blockless_env::add_drivers_to_linker);
         add_to_linker!(blockless_env::add_http_to_linker);
+        add_to_linker!(blockless_env::add_llm_to_linker);
         add_to_linker!(blockless_env::add_ipfs_to_linker);
         add_to_linker!(blockless_env::add_s3_to_linker);
         add_to_linker!(blockless_env::add_memory_to_linker);

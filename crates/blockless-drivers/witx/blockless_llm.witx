@@ -1,0 +1,84 @@
+(typename $llm_error
+  (enum (@witx tag u16)
+    ;;; Success
+    $success
+    ;;; Model not set
+    $model_not_set
+    ;;; Model not supported
+    $model_not_supported
+    ;;; Model initialization failed
+    $model_initialization_failed
+    ;;; Model completion failed
+    $model_completion_failed
+    ;;; Options not set
+    $model_options_not_set
+    ;;; Model shutdown failed
+    $model_shutdown_failed
+    ;;; UTF-8 error
+    $utf8_error
+    ;;; Runtime error
+    $runtime_error
+  )
+)
+
+;;; Handle for LLM contexts
+(typename $llm_handle u32)
+
+;;; Number of bytes written with max u8
+(typename $written_bytes_u8 u8)
+
+;;; Number of bytes written with max u16
+(typename $written_bytes_u16 u16)
+
+(module $blockless_llm
+    ;;; Set the LLM model
+    (@interface func (export "llm_set_model_request")
+        (param $handle (@witx pointer $llm_handle))
+        (param $model string)
+        (result $error (expected (error $llm_error)))
+    )
+
+    ;;; Get the current model name
+    (@interface func (export "llm_get_model_response")
+        (param $handle $llm_handle)
+        (param $buf (@witx pointer u8))
+        (param $buf_len u8)
+        (result $error (expected $written_bytes_u8 (error $llm_error)))
+    )
+
+    ;;; Set the LLM model options
+    (@interface func (export "llm_set_model_options_request")
+        (param $handle $llm_handle)
+        (param $options string)
+        (result $error (expected (error $llm_error)))
+    )
+
+    ;;; Get the model options
+    (@interface func (export "llm_get_model_options")
+        (param $handle $llm_handle)
+        (param $buf (@witx pointer u8))
+        (param $buf_len u16)
+        (result $error (expected $written_bytes_u16 (error $llm_error)))
+    )
+
+    ;;; Prompt the LLM
+    (@interface func (export "llm_prompt_request")
+        (param $handle $llm_handle)
+        (param $prompt string)
+        (result $error (expected (error $llm_error)))
+    )
+
+    ;;; Read the prompt response
+    (@interface func (export "llm_read_prompt_response")
+        (param $handle $llm_handle)
+        (param $buf (@witx pointer u8))
+        (param $buf_len u16)
+        (result $error (expected $written_bytes_u16 (error $llm_error)))
+    )
+
+    ;;; Close a request handle
+    (@interface func (export "llm_close")
+        (param $handle $llm_handle)
+        (result $error (expected (error $llm_error)))
+    )
+)

@@ -203,3 +203,15 @@ impl std::fmt::Display for BlocklessSocketErrorKind {
         }
     }
 }
+
+#[derive(Debug)]
+pub enum LlmErrorKind {
+    ModelNotSet,               // 1
+    ModelNotSupported,         // 2
+    ModelInitializationFailed, // 3
+    ModelCompletionFailed,     // 4
+    ModelOptionsNotSet,        // 5
+    ModelShutdownFailed,       // 6
+    Utf8Error,                 // 7
+    RuntimeError,              // 8
+}

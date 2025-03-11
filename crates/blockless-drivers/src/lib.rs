@@ -3,6 +3,7 @@ pub mod cgi_driver;
 pub mod error;
 pub mod http_driver;
 pub mod ipfs_driver;
+pub mod llm_driver;
 pub mod memory_driver;
 pub mod read_ext;
 pub mod s3_driver;
@@ -30,11 +31,7 @@ type OpenFuture = Pin<Box<dyn Future<Output = Result<Box<dyn WasiFile>, ErrorKin
 pub trait Driver {
     fn name(&self) -> &str;
 
-    fn open(
-        &self,
-        uri: &str,
-        opts: &str,
-    ) -> OpenFuture;
+    fn open(&self, uri: &str, opts: &str) -> OpenFuture;
 }
 
 lazy_static! {

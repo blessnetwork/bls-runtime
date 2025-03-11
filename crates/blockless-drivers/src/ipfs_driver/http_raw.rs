@@ -109,8 +109,10 @@ impl HttpRaw {
         buf.write_all(format!("Content-Length: {}", body_buf.len()).as_bytes())
             .unwrap();
         buf.write_all(EOL).unwrap();
-        buf.write_all(format!("Content-Type: multipart/form-data; boundary={}", boundary).as_bytes())
-            .unwrap();
+        buf.write_all(
+            format!("Content-Type: multipart/form-data; boundary={}", boundary).as_bytes(),
+        )
+        .unwrap();
         buf.write_all(EOL).unwrap();
         buf.write_all(EOL).unwrap();
         buf.extend_from_slice(&body_buf);
