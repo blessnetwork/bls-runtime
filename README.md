@@ -12,6 +12,94 @@ The runtime is built on WebAssembly (Wasm) technology and therefore has the foll
 
 - Customizability: The runtime provides a configurable file to offer various options such as additional restrictions on WebAssembly beyond its basic guarantees, including CPU and memory consumption.
 
+## Architecture
+
+```mermaid
+graph TD
+    subgraph "Configuration Layer"
+        CLI["bls-runtime (CLI/Config Loader)"]
+        LOGGING["Logging (runtime_logger)"]
+    end
+
+    subgraph "Core Engine"
+        CORE["blockless (Core Runtime Engine)"]
+    end
+
+    subgraph "Driver Modules"
+        DRIVER_ROOT["blockless-drivers"]
+        CDYLIB["cdylib Driver"]
+        CGI["CGI Driver"]
+        HTTP["HTTP Driver"]
+        IPFS["IPFS Driver"]
+        LLM["LLM Driver"]
+        MEMORY["Memory Driver"]
+        S3["S3 Driver"]
+        TCP["TCP Driver"]
+        WASI["WASI Support Files"]
+        WITX["Interface Definitions (Witx)"]
+    end
+
+    subgraph "Auxiliary Libraries"
+        ENV["blockless-env"]
+        MULTI["blockless-multiaddr"]
+        WASI_COMMON["wasi-common"]
+    end
+
+    subgraph "Supported Languages"
+        RUST["Rust Modules"]
+        GO["Go Modules"]
+        AS["AssemblyScript Modules"]
+    end
+
+    CLI -->|"loadsConfig"| CORE
+    CORE -->|"passesModules"| DRIVER_ROOT
+    CORE -->|"uses"| ENV
+    CORE -->|"uses"| MULTI
+    CORE -->|"uses"| WASI_COMMON
+    CORE -->|"logsTo"| LOGGING
+    RUST -->|"WasmCompiled"| CORE
+    GO -->|"WasmCompiled"| CORE
+    AS -->|"WasmCompiled"| CORE
+
+    DRIVER_ROOT -->|"contains"| CDYLIB
+    DRIVER_ROOT -->|"contains"| CGI
+    DRIVER_ROOT -->|"contains"| HTTP
+    DRIVER_ROOT -->|"contains"| IPFS
+    DRIVER_ROOT -->|"contains"| LLM
+    DRIVER_ROOT -->|"contains"| MEMORY
+    DRIVER_ROOT -->|"contains"| S3
+    DRIVER_ROOT -->|"contains"| TCP
+    DRIVER_ROOT -->|"contains"| WASI
+    DRIVER_ROOT -->|"contains"| WITX
+
+    class CLI,CORE,LOGGING core
+    class DRIVER_ROOT,CDYLIB,CGI,HTTP,IPFS,LLM,MEMORY,S3,TCP,WASI,WITX driver
+    class ENV,MULTI,WASI_COMMON aux
+    class RUST,GO,AS language
+
+    click CORE "https://github.com/blessnetwork/bls-runtime/tree/main/blockless/"
+    click CLI "https://github.com/blessnetwork/bls-runtime/tree/main/bls-runtime/"
+    click DRIVER_ROOT "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-drivers/"
+    click CDYLIB "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-drivers/src/cdylib_driver/"
+    click CGI "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-drivers/src/cgi_driver/"
+    click HTTP "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-drivers/src/http_driver/"
+    click IPFS "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-drivers/src/ipfs_driver/"
+    click LLM "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-drivers/src/llm_driver/"
+    click MEMORY "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-drivers/src/memory_driver/"
+    click S3 "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-drivers/src/s3_driver/"
+    click TCP "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-drivers/src/tcp_driver/"
+    click WASI "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-drivers/src/wasi/"
+    click WITX "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-drivers/witx/"
+    click ENV "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-env/"
+    click MULTI "https://github.com/blessnetwork/bls-runtime/tree/main/crates/blockless-multiaddr/"
+    click WASI_COMMON "https://github.com/blessnetwork/bls-runtime/tree/main/crates/wasi-common/"
+    click GO "https://github.com/blessnetwork/bls-runtime/tree/main/examples/golang/"
+
+    classDef core fill:#87CEFA,stroke:#000,stroke-width:2px;
+    classDef driver fill:#F4A460,stroke:#000,stroke-width:2px;
+    classDef aux fill:#DA70D6,stroke:#000,stroke-width:2px;
+    classDef language fill:#98FB98,stroke:#000,stroke-width:2px;
+```
 
 ## Building the Project
 1. Install Rust by visiting the website 'https://rustup.rs/'
