@@ -481,7 +481,7 @@ mod tests {
         // let mut provider = LlamafileProvider::new(Models::URL("https://huggingface.co/Mozilla/mxbai-embed-large-v1-llamafile/resolve/main/mxbai-embed-large-v1-f16.llamafile".try_into().unwrap()));
 
         // larger model
-        let mut provider = LlamafileProvider::new(Models::URL("https://huggingface.co/Mozilla/Meta-Llama-3.1-8B-Instruct-llamafile/resolve/main/Meta-Llama-3.1-8B-Instruct.Q6_K.llamafile".try_into().unwrap()));
+        let mut provider = LlamafileProvider::new(Models::Url("https://huggingface.co/Mozilla/Meta-Llama-3.1-8B-Instruct-llamafile/resolve/main/Meta-Llama-3.1-8B-Instruct.Q6_K.llamafile".try_into().unwrap()));
         provider
             .initialize(ProviderConfig::default())
             .await

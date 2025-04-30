@@ -9,7 +9,7 @@ pub enum Models {
     Gemma22BInstruct(Option<String>),
     Gemma27BInstruct(Option<String>),
     Gemma29BInstruct(Option<String>),
-    URL(url::Url),
+    Url(url::Url),
 }
 
 impl Models {
@@ -30,7 +30,7 @@ impl Models {
             Models::Gemma22BInstruct(_) => Some("Mozilla/gemma-2-2b-it-llamafile".to_string()),
             Models::Gemma27BInstruct(_) => Some("Mozilla/gemma-2-27b-it-llamafile".to_string()),
             Models::Gemma29BInstruct(_) => Some("Mozilla/gemma-2-9b-it-llamafile".to_string()),
-            Models::URL(_) => None,
+            Models::Url(_) => None,
         }
     }
 
@@ -66,7 +66,7 @@ impl Models {
             }
             // Assume format is `https://huggingface.co/Mozilla/Meta-Llama-3.1-8B-Instruct-llamafile/resolve/main/Meta-Llama-3.1-8B-Instruct.Q6_K.llamafile?download=true`
             // and return the last part before any query parameters
-            Models::URL(model_url) => model_url
+            Models::Url(model_url) => model_url
                 .path_segments()
                 .unwrap()
                 .last()
@@ -131,7 +131,7 @@ impl FromStr for Models {
             }
             // Model must be a valid URL
             _ => url::Url::parse(s)
-                .map(|url| Models::URL(url))
+                .map(Models::Url)
                 .map_err(|_| format!("Invalid model url: {}", s)),
         }
     }
@@ -147,7 +147,7 @@ impl std::fmt::Display for Models {
             Models::Gemma22BInstruct(_) => write!(f, "gemma-2-2b-it"),
             Models::Gemma27BInstruct(_) => write!(f, "gemma-2-27b-it"),
             Models::Gemma29BInstruct(_) => write!(f, "gemma-2-9b-it"),
-            Models::URL(model_url) => write!(f, "{}", model_url),
+            Models::Url(model_url) => write!(f, "{}", model_url),
         }
     }
 }
