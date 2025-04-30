@@ -379,6 +379,7 @@ async fn download_model(url: url::Url, model_path: &PathBuf) -> Result<(), Provi
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::llm_driver::provider::Role;
     use std::str::FromStr;
     use tracing::Level;
     use tracing_subscriber::FmtSubscriber;
@@ -443,37 +444,62 @@ mod tests {
         let result = download_model(url, &model_path).await;
         assert!(result.is_ok());
     }
+
+    #[ignore = "requires downloading large LLM model"]
+    #[tokio::test]
+    async fn test_llamafile_lifecycle_supported_model() {
         init_test_logging();
 
-        let mut provider = LlamafileProvider::new(SupportedModels::Llama321BInstruct(None));
+        let mut provider = LlamafileProvider::new(Models::Llama321BInstruct(None));
         provider
-            .initialize(&ProviderConfig::default())
+            .initialize(ProviderConfig::default())
             .await
             .unwrap();
 
         let messages = vec![
             Message {
-                role: "system".to_string(),
+                role: Role::System,
                 content: "You are a helpful assistant.".to_string(),
             },
             Message {
-                role: "user".to_string(),
+                role: Role::User,
                 content: "Hello!".to_string(),
             },
         ];
 
-        let response = provider.chat(messages).await.unwrap();
+        let response = provider.chat(&messages).await.unwrap();
         info!("Chat response: {:?}", response);
         assert!(!response.content.is_empty());
     }
 
-    #[test]
-    fn test_model_parsing() {
-        assert!(SupportedModels::from_str("Llama-3.2-1B-Instruct").is_ok());
-        assert!(SupportedModels::from_str("Llama-3.2-1B-Instruct-Q6_K").is_ok());
+    #[ignore = "requires downloading large LLM models"]
+    #[tokio::test]
+    async fn test_llamafile_lifecycle_custom_model_url() {
+        init_test_logging();
 
-        assert!(SupportedModels::from_str("Llama-3.2-3B-Instruct").is_ok());
-        assert!(SupportedModels::from_str("Llama-3.2-3B-Instruct-Q6_K").is_ok());
-        assert!(SupportedModels::from_str("unsupported-model").is_err());
+        // smaller model; note: throws error when running - issue with llamafile server
+        // let mut provider = LlamafileProvider::new(Models::URL("https://huggingface.co/Mozilla/mxbai-embed-large-v1-llamafile/resolve/main/mxbai-embed-large-v1-f16.llamafile".try_into().unwrap()));
+
+        // larger model
+        let mut provider = LlamafileProvider::new(Models::URL("https://huggingface.co/Mozilla/Meta-Llama-3.1-8B-Instruct-llamafile/resolve/main/Meta-Llama-3.1-8B-Instruct.Q6_K.llamafile".try_into().unwrap()));
+        provider
+            .initialize(ProviderConfig::default())
+            .await
+            .unwrap();
+
+        let messages = vec![
+            Message {
+                role: Role::System,
+                content: "You are a helpful assistant.".to_string(),
+            },
+            Message {
+                role: Role::User,
+                content: "Hello!".to_string(),
+            },
+        ];
+
+        let response = provider.chat(&messages).await.unwrap();
+        info!("Chat response: {:?}", response);
+        assert!(!response.content.is_empty());
     }
 }
