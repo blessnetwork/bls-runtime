@@ -3,13 +3,13 @@ mod llamafile;
 mod models;
 mod provider;
 
-use crate::LlmErrorKind;
+use crate::{LlmErrorKind, llm_driver::provider::Role};
 use handle::HandleMap;
 use llamafile::LlamafileProvider;
-use models::SupportedModels;
+use models::Models;
 use provider::{LLMProvider, Message, ProviderConfig};
 use serde::{Deserialize, Serialize};
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock, Mutex};
 
 // Global variables (single instance of the context map)
 static CONTEXTS: LazyLock<HandleMap<LlmContext<LlamafileProvider>>> =
@@ -17,46 +17,43 @@ static CONTEXTS: LazyLock<HandleMap<LlmContext<LlamafileProvider>>> =
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LlmOptions {
-    pub system_message: String,
+    pub system_message: Option<String>,
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
 }
 
 #[derive(Clone)]
-pub struct LlmContext<P: LLMProvider + Clone> {
+pub struct LlmContext<P: LLMProvider> {
     model: String,
-    provider: P,
+    provider: Arc<P>,
     options: LlmOptions,
-    messages: Vec<Message>,
+    messages: Arc<Mutex<Vec<Message>>>,
 }
 
 impl<P: LLMProvider + Clone> LlmContext<P> {
     async fn new(model: String, mut provider: P) -> Result<Self, LlmErrorKind> {
         provider
-            .initialize(&ProviderConfig::default())
+            .initialize(ProviderConfig::default())
             .await
             .map_err(|_| LlmErrorKind::ModelInitializationFailed)?;
 
         Ok(Self {
             model,
-            provider,
+            provider: Arc::new(provider),
             options: LlmOptions::default(),
-            messages: Vec::new(),
+            messages: Arc::new(Mutex::new(Vec::new())),
         })
     }
 
-    fn add_message(&mut self, role: &str, content: &str) {
-        self.messages.push(Message {
-            role: role.to_string(),
-            content: content.to_string(),
-        });
+    fn add_message(&mut self, role: Role, content: String) {
+        let mut messages = self.messages.lock().unwrap();
+        messages.push(Message { role, content });
     }
 }
 
 pub async fn llm_set_model(model: &str) -> Result<u32, LlmErrorKind> {
-    // Parse model string to SupportedModels
-    let supported_model: SupportedModels =
-        model.parse().map_err(|_| LlmErrorKind::ModelNotSupported)?;
+    // Parse model string to Models
+    let supported_model: Models = model.parse().map_err(|_| LlmErrorKind::ModelNotSupported)?;
 
     // Create provider and context
     let provider = LlamafileProvider::new(supported_model);
@@ -70,8 +67,9 @@ pub async fn llm_set_model(model: &str) -> Result<u32, LlmErrorKind> {
 }
 
 pub async fn llm_get_model(handle: u32) -> Result<String, LlmErrorKind> {
-    let ctx = CONTEXTS.get(handle).ok_or(LlmErrorKind::ModelNotSet)?;
-    Ok(ctx.model.clone())
+    CONTEXTS
+        .with_instance(handle, |ctx| ctx.model.clone())
+        .ok_or(LlmErrorKind::ModelNotSet)
 }
 
 pub async fn llm_set_options(handle: u32, options: &[u8]) -> Result<(), LlmErrorKind> {
@@ -89,13 +87,17 @@ pub async fn llm_set_options(handle: u32, options: &[u8]) -> Result<(), LlmError
 }
 
 pub async fn llm_get_options(handle: u32) -> Result<LlmOptions, LlmErrorKind> {
-    let ctx = CONTEXTS.get(handle).ok_or(LlmErrorKind::ModelNotSet)?;
-    Ok(ctx.options.clone())
+    CONTEXTS
+        .with_instance(handle, |ctx| ctx.options.clone())
+        .ok_or(LlmErrorKind::ModelNotSet)
 }
 
 pub async fn llm_prompt(handle: u32, prompt: &str) -> Result<(), LlmErrorKind> {
-    let mut ctx = CONTEXTS.get(handle).ok_or(LlmErrorKind::ModelNotSet)?;
-    ctx.add_message("user", prompt);
+    CONTEXTS
+        .with_instance_mut(handle, |ctx| {
+            ctx.add_message(Role::User, prompt.to_string());
+        })
+        .ok_or(LlmErrorKind::ModelNotSet)?;
     Ok(())
 }
 
@@ -120,8 +122,24 @@ pub async fn llm_read_response(handle: u32) -> Result<String, LlmErrorKind> {
 }
 
 pub async fn llm_close(handle: u32) -> Result<(), LlmErrorKind> {
-    if let Some(mut ctx) = CONTEXTS.remove(handle) {
-        ctx.provider
+    if let Some(ctx) = CONTEXTS.remove(handle) {
+        // Try to unwrap the Arc to get exclusive ownership
+        let provider = match Arc::try_unwrap(ctx.provider) {
+            Ok(provider) => provider,
+            Err(arc_provider) => {
+                // If we can't get exclusive ownership, log and force a clone to shutdown
+                tracing::error!("Provider has multiple references during shutdown, forcing shutdown");
+                let mut provider_clone = (*arc_provider).clone();
+                provider_clone
+                    .shutdown()
+                    .map_err(|_| LlmErrorKind::ModelShutdownFailed)?;
+                return Ok(());
+            }
+        };
+
+        // exclusive ownership ensured, shutdown properly
+        let mut provider = provider;
+        provider
             .shutdown()
             .map_err(|_| LlmErrorKind::ModelShutdownFailed)?;
     }
