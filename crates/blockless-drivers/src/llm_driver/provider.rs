@@ -74,10 +74,10 @@ impl Default for ProviderConfig {
 #[async_trait::async_trait]
 pub trait LLMProvider: Send + Sync + std::fmt::Debug {
     /// Initialize the provider with any necessary setup
-    async fn initialize(&mut self, config: &ProviderConfig) -> Result<(), ProviderError>;
+    async fn initialize(&mut self, config: ProviderConfig) -> Result<(), ProviderError>;
 
     /// Generate a chat completion based on the conversation history
-    async fn chat(&self, messages: Vec<Message>) -> Result<Message, ProviderError>;
+    async fn chat(&self, messages: &[Message]) -> Result<Message, ProviderError>;
 
     /// Perform any necessary cleanup when shutting down
     fn shutdown(&mut self) -> Result<(), ProviderError>;

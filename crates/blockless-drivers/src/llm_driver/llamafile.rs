@@ -112,21 +112,32 @@ impl LlamafileProvider {
 
 #[async_trait::async_trait]
 impl LLMProvider for LlamafileProvider {
-    async fn initialize(&mut self, config: &ProviderConfig) -> Result<(), ProviderError> {
+    /// Initialize the provider with the given configuration
+    /// - Checks if the model file exists, otherwise downloads it
+    /// - Starts the llamafile server for the model
+    async fn initialize(&mut self, config: ProviderConfig) -> Result<(), ProviderError> {
         info!(
             "Initializing Llamafile provider for model: {}",
             self.model.to_string()
         );
-        self.config = config.clone();
-        self.ensure_model_exists().await?;
+        self.config = config;
+        let model_path = self.get_model_path();
+        if !model_path.exists() {
+            info!(
+                "Model not found, downloading to `{}`...",
+                model_path.display()
+            );
+            let url = self.model_file_url();
+            download_model(url, &model_path).await?;
+        }
         self.start_server()?;
 
         // Wait for server to start
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
         Ok(())
     }
 
-    async fn chat(&self, messages: Vec<Message>) -> Result<Message, ProviderError> {
+    async fn chat(&self, messages: &[Message]) -> Result<Message, ProviderError> {
         let client = reqwest::Client::new();
         let url = format!(
             "http://{}:{}/v1/chat/completions",
@@ -134,7 +145,7 @@ impl LLMProvider for LlamafileProvider {
         );
 
         let payload = serde_json::json!({
-          "model": "LLaMA_CPP",
+          "model": self.model.to_string(),
           "messages": messages,
         });
 
