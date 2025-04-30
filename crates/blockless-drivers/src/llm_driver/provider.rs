@@ -30,8 +30,11 @@ impl std::fmt::Display for Role {
 #[derive(Debug)]
 pub enum ProviderError {
     InitializationFailed(String),
+    ServerResponseError(String),
     CommunicationError(String),
     InvalidResponse(String),
+    StreamError(String),
+    LLamaFileServerError(String),
     ShutdownError(String),
 }
 
@@ -39,8 +42,11 @@ impl std::fmt::Display for ProviderError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InitializationFailed(msg) => write!(f, "Initialization failed: {}", msg),
+            Self::ServerResponseError(msg) => write!(f, "Server response error: {}", msg),
             Self::CommunicationError(msg) => write!(f, "Communication error: {}", msg),
             Self::InvalidResponse(msg) => write!(f, "Invalid response: {}", msg),
+            Self::StreamError(msg) => write!(f, "Stream error: {}", msg),
+            Self::LLamaFileServerError(msg) => write!(f, "Start server error: {}", msg),
             Self::ShutdownError(msg) => write!(f, "Shutdown error: {}", msg),
         }
     }
