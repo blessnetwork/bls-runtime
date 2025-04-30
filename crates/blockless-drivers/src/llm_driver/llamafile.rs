@@ -1,10 +1,10 @@
 use crate::llm_driver::{
-    models::SupportedModels,
+    models::Models,
     provider::{LLMProvider, Message, ProviderConfig, ProviderError},
 };
 use reqwest;
 use std::{
-    io::Write,
+    io::ErrorKind,
     path::PathBuf,
     process::{Child, Command, Stdio},
 };
@@ -13,18 +13,18 @@ use tracing::{debug, info};
 
 /// The base path for the models from home directory
 const BASE_MODEL_PATH: &str = ".blessnet/models";
-const LLAMAFILE_BASE_URL: &str = "https://huggingface.co/Mozilla";
+const LLAMAFILE_BASE_HUGGINGFACE_URL: &str = "https://huggingface.co";
 
 #[derive(Debug)]
 pub struct LlamafileProvider {
-    pub model: SupportedModels,
+    pub model: Models,
     process: Option<Child>,
     config: ProviderConfig,
 }
 
 impl Default for LlamafileProvider {
     fn default() -> Self {
-        Self::new(SupportedModels::Llama323BInstruct(None))
+        Self::new(Models::Llama323BInstruct(None))
     }
 }
 
@@ -39,7 +39,7 @@ impl Clone for LlamafileProvider {
 }
 
 impl LlamafileProvider {
-    pub fn new(model: SupportedModels) -> Self {
+    pub fn new(model: Models) -> Self {
         Self {
             model,
             process: None,
@@ -48,13 +48,21 @@ impl LlamafileProvider {
     }
 
     fn model_file_url(&self) -> url::Url {
-        let model_name = self.model.model_repo();
-        let model_file = self.model.model_file();
-        let url = format!(
-            "{}/{}/resolve/main/{}?download=true",
-            LLAMAFILE_BASE_URL, model_name, model_file
-        );
-        url::Url::parse(&url).unwrap()
+        match self.model.model_repo() {
+            Some(model_repo) => {
+                let model_file = self.model.model_file();
+                let url = format!(
+                    "{}/{}/resolve/main/{}?download=true",
+                    LLAMAFILE_BASE_HUGGINGFACE_URL, model_repo, model_file
+                );
+                url::Url::parse(&url).unwrap()
+            }
+            None => {
+                // The model file must be a valid URL at this point
+                let model_file_url = self.model.to_string();
+                url::Url::parse(&model_file_url).unwrap()
+            }
+        }
     }
 
     fn get_model_path(&self) -> PathBuf {
