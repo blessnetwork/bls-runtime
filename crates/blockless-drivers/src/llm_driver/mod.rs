@@ -149,33 +149,30 @@ pub async fn llm_close(handle: u32) -> Result<(), LlmErrorKind> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tracing::{Level, info};
     use tracing_subscriber::FmtSubscriber;
 
-    #[ignore]
+    #[ignore = "requires downloading large LLM model"]
     #[tokio::test]
     async fn test_llm_driver_e2e() {
         let _ = FmtSubscriber::builder()
-            .with_max_level(Level::DEBUG)
+            .with_max_level(tracing::Level::DEBUG)
             .with_test_writer()
             .try_init();
 
-        info!("Starting E2E test for LLM driver");
-
-        // 1. Set model and verify
-        info!("Setting up model...");
+        // Set model and verify
+        tracing::info!("Setting up model...");
         let handle = llm_set_model("Llama-3.2-1B-Instruct").await.unwrap();
         let model = llm_get_model(handle).await.unwrap();
         assert_eq!(model, "Llama-3.2-1B-Instruct");
 
-        // 2. Set options and verify
+        // Set options and verify
         let system_message = r#"
         You are a helpful assistant.
         First time I ask, you name will be lucy.
         Second time I ask, you name will be bob.
         "#;
         let initial_options = LlmOptions {
-            system_message: system_message.to_string(),
+            system_message: Some(system_message.to_string()),
             temperature: Some(0.7),
             top_p: Some(0.9),
         };
@@ -189,19 +186,19 @@ mod tests {
         let prompt1 = "What is your name?";
         llm_prompt(handle, prompt1).await.unwrap();
         let response1 = llm_read_response(handle).await.unwrap();
-        info!("Q1: {}\nA1: {}", prompt1, response1);
+        tracing::info!("Q1: {}\nA1: {}", prompt1, response1);
         assert!(!response1.is_empty());
 
         // Second interaction
         let prompt2 = "What is your name?";
         llm_prompt(handle, prompt2).await.unwrap();
         let response2 = llm_read_response(handle).await.unwrap();
-        info!("Q2: {}\nA2: {}", prompt2, response2);
+        tracing::info!("Q2: {}\nA2: {}", prompt2, response2);
         assert!(!response2.is_empty());
 
         // Update options
         let updated_options = LlmOptions {
-            system_message: "You are now a mathematics tutor.".to_string(),
+            system_message: Some("You are now a mathematics tutor.".to_string()),
             temperature: Some(0.5),
             top_p: Some(0.95),
         };
@@ -214,7 +211,7 @@ mod tests {
         assert_eq!(final_options, updated_options);
 
         // Clean up
-        info!("Cleaning up...");
+        tracing::info!("Cleaning up...");
         llm_close(handle).await.unwrap();
     }
 }
