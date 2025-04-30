@@ -390,9 +390,59 @@ mod tests {
             .try_init();
     }
 
-    #[ignore]
+    // small model
+    // let mut provider = LlamafileProvider::new(Models::URL("https://huggingface.co/Mozilla/Llama-3.2-1B-Instruct-llamafile/resolve/main/Llama-3.2-1B-Instruct.Q6_K.llamafile".try_into().unwrap()));
+
+    #[test]
+    fn test_model_parsing() {
+        // Supported model urls
+        assert!(Models::from_str("Llama-3.2-1B-Instruct").is_ok());
+        assert!(Models::from_str("Llama-3.2-1B-Instruct-Q6_K").is_ok());
+        assert!(Models::from_str("Llama-3.2-3B-Instruct").is_ok());
+        assert!(Models::from_str("Llama-3.2-3B-Instruct-Q6_K").is_ok());
+
+        // Valid model - which is a valid URL
+        assert!(Models::from_str("https://huggingface.co/Mozilla/Llama-3.2-1B-Instruct-llamafile/resolve/main/Llama-3.2-1B-Instruct.Q6_K.llamafile").is_ok());
+
+        // Invalid model - which is not a valid URL
+        assert!(Models::from_str("unsupported-model").is_err());
+    }
+
     #[tokio::test]
-    async fn test_llamafile_lifecycle() {
+    async fn test_download_invalid_model_url_fails() {
+        let url: url::Url =
+            "https://huggingface.co/Mozilla/some-test-model/resolve/main/some-test-model.llamafile"
+                .try_into()
+                .unwrap();
+        let temp_dir = tempdir::TempDir::new("test_models").unwrap();
+        let model_path = temp_dir.path().join("some-test-model.llamafile");
+        let result = download_model(url, &model_path).await;
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap().to_string(),
+            "Server response error: Failed to download model; status code: 401"
+        );
+    }
+
+    #[ignore = "requires downloading LLM model"]
+    #[tokio::test]
+    async fn test_download_model() {
+        let url: url::Url = "https://huggingface.co/Mozilla/mxbai-embed-large-v1-llamafile/resolve/main/mxbai-embed-large-v1-f16.llamafile".try_into().unwrap();
+        let temp_dir = tempdir::TempDir::new("test_models").unwrap();
+        let model_path = temp_dir.path().join("mxbai-embed-large-v1-f16.llamafile");
+        let result = download_model(url, &model_path).await;
+        assert!(result.is_ok());
+    }
+
+    #[ignore = "requires downloading LLM model"]
+    #[tokio::test]
+    async fn test_download_model_with_query_params() {
+        let url: url::Url = "https://huggingface.co/Mozilla/mxbai-embed-large-v1-llamafile/resolve/main/mxbai-embed-large-v1-f16.llamafile?download=true".try_into().unwrap();
+        let temp_dir = tempdir::TempDir::new("test_models").unwrap();
+        let model_path = temp_dir.path().join("mxbai-embed-large-v1-f16.llamafile");
+        let result = download_model(url, &model_path).await;
+        assert!(result.is_ok());
+    }
         init_test_logging();
 
         let mut provider = LlamafileProvider::new(SupportedModels::Llama321BInstruct(None));
