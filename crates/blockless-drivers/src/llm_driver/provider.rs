@@ -3,8 +3,28 @@ use std::fmt::Debug;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
-    pub role: String,
+    pub role: Role,
     pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Role {
+    #[serde(rename = "system")]
+    System,
+    #[serde(rename = "user")]
+    User,
+    #[serde(rename = "assistant")]
+    Assistant,
+}
+
+impl std::fmt::Display for Role {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::System => write!(f, "system"),
+            Self::User => write!(f, "user"),
+            Self::Assistant => write!(f, "assistant"),
+        }
+    }
 }
 
 #[derive(Debug)]
