@@ -125,17 +125,29 @@ impl LlamafileProvider {
 
     fn start_server(&mut self) -> Result<(), ProviderError> {
         let model_path = self.get_model_path();
-        let process = Command::new(&model_path)
-            .arg("--server")
-            .arg("--nobrowser")
-            .arg("--host")
-            .arg(&self.config.host)
-            .arg("--port")
-            .arg(self.config.port.to_string())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?;
+
+        let command_str = format!(
+            "{} --server --nobrowser --host {} --port {}",
+            model_path.display(),
+            self.config.host,
+            self.config.port
+        );
+        debug!("Starting llamafile server with command: `{}`", command_str);
+
+        // Build the command
+        let mut command = Command::new(&model_path);
+        command.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+        // Spawn the process
+        let process = command.spawn().map_err(|e| match e.kind() {
+            ErrorKind::NotFound => {
+                ProviderError::LLamaFileServerError("LlamaFile not found".to_string())
+            }
+            ErrorKind::PermissionDenied => ProviderError::LLamaFileServerError(
+                "Permission denied; please re-download the model".to_string(),
+            ),
+            _ => ProviderError::LLamaFileServerError(e.to_string()),
+        })?;
 
         self.process = Some(process);
         debug!(
