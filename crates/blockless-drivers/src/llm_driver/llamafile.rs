@@ -75,54 +75,6 @@ impl LlamafileProvider {
             .unwrap()
     }
 
-    async fn ensure_model_exists(&self) -> Result<(), ProviderError> {
-        let model_path = self.get_model_path();
-        if !model_path.exists() {
-            info!(
-                "Model not found, downloading to `{}`...",
-                model_path.display()
-            );
-            self.download_model().await?;
-        }
-        Ok(())
-    }
-
-    async fn download_model(&self) -> Result<(), ProviderError> {
-        let model_path = self.get_model_path();
-        let model_dir = model_path.parent().unwrap();
-        fs::create_dir_all(model_dir)
-            .await
-            .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?;
-
-        let url = self.model_file_url();
-        let response = reqwest::get(url)
-            .await
-            .map_err(|e| ProviderError::CommunicationError(e.to_string()))?;
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|e| ProviderError::CommunicationError(e.to_string()))?;
-
-        let mut file = std::fs::File::create(&model_path)
-            .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?;
-        file.write_all(&bytes)
-            .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?;
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = file
-                .metadata()
-                .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?
-                .permissions();
-            perms.set_mode(0o755);
-            file.set_permissions(perms)
-                .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?;
-        }
-
-        Ok(())
-    }
-
     fn start_server(&mut self) -> Result<(), ProviderError> {
         let model_path = self.get_model_path();
 
@@ -224,6 +176,193 @@ impl Drop for LlamafileProvider {
             debug!("Failed to shutdown llamafile server: {}", e);
         }
     }
+}
+
+/// Downloads a model file with resumable download support.
+///
+/// # Features
+/// - Resumes interrupted downloads using HTTP Range headers
+/// - Uses .part files for tracking partial downloads
+/// - Shows download progress and verifies file size
+/// - Sets executable permissions on completion
+///
+/// # Arguments
+/// * `url` - Source URL for the model
+/// * `model_path` - Destination path to save the model
+///
+/// # Errors
+/// Returns ProviderError for directory creation failures, network errors,
+/// server errors (404, etc.), or file operation failures.
+async fn download_model(url: url::Url, model_path: &PathBuf) -> Result<(), ProviderError> {
+    // create the model directory if it doesn't exist
+    if let Some(model_dir) = model_path.parent() {
+        fs::create_dir_all(model_dir).await.map_err(|e| {
+            ProviderError::InitializationFailed(format!("Failed to create model directory: {}", e))
+        })?;
+    } else {
+        return Err(ProviderError::InitializationFailed(
+            "Invalid model path: no parent directory".to_string(),
+        ));
+    }
+
+    // perform a HEAD request to check if the model file exists
+    let client = reqwest::Client::new();
+    let head_response = client
+        .head(url.clone())
+        .send()
+        .await
+        .map_err(|e| ProviderError::CommunicationError(e.to_string()))?;
+    let status_code = head_response.status().as_u16();
+    if status_code >= 400 {
+        return Err(ProviderError::ServerResponseError(format!(
+            "Failed to download model; status code: {}",
+            status_code
+        )));
+    }
+
+    // Get total size from headers (prefer x-linked-size if available)
+    let total_size = head_response
+        .headers()
+        .get("x-linked-size")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok())
+        .or_else(|| {
+            head_response
+                .headers()
+                .get(reqwest::header::CONTENT_LENGTH)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u64>().ok())
+        })
+        .unwrap_or(0);
+    if total_size == 0 {
+        info!("Warning: Unable to determine total file size for download");
+    } else {
+        info!("Total download size: {} bytes", total_size);
+    }
+
+    // Use a .part file for partial downloads
+    let part_path = model_path.with_extension("part");
+
+    // Check if partial file exists and get its size
+    let file_size = if part_path.exists() {
+        fs::metadata(&part_path).await.map(|m| m.len()).unwrap_or(0)
+    } else {
+        0
+    };
+
+    // If the file is already complete, just rename it
+    if total_size > 0 && file_size == total_size {
+        info!("Download already complete, finalizing...");
+        fs::rename(&part_path, model_path)
+            .await
+            .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?;
+    } else {
+        // File is incomplete or size unknown, start/resume download
+        let mut file = if file_size > 0 {
+            info!(
+                "Resuming download from byte {} of {} ({}%)",
+                file_size,
+                total_size,
+                if total_size > 0 {
+                    file_size * 100 / total_size
+                } else {
+                    0
+                }
+            );
+            tokio::fs::OpenOptions::new()
+                .write(true)
+                .append(true)
+                .open(&part_path)
+                .await
+                .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?
+        } else {
+            info!("Starting new download to `{}`...", part_path.display());
+            tokio::fs::File::create(&part_path)
+                .await
+                .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?
+        };
+
+        // Create request with Range header if resuming
+        let mut req = client.get(url.clone());
+        if file_size > 0 {
+            req = req.header(reqwest::header::RANGE, format!("bytes={}-", file_size));
+        }
+
+        let mut response = req
+            .send()
+            .await
+            .map_err(|e| ProviderError::ServerResponseError(e.to_string()))?;
+        if !response.status().is_success() {
+            return Err(ProviderError::ServerResponseError(format!(
+                "Download failed; status code: {}",
+                response.status()
+            )));
+        }
+
+        // Stream response to file, log progress periodically
+        let mut downloaded = file_size;
+        let mut last_percentage = downloaded * 100 / total_size.max(1);
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| ProviderError::StreamError(e.to_string()))?
+        {
+            tokio::io::copy_buf(&mut chunk.as_ref(), &mut file)
+                .await
+                .map_err(|e| ProviderError::StreamError(e.to_string()))?;
+
+            downloaded += chunk.len() as u64;
+
+            // Log progress periodically
+            if total_size > 0 {
+                let percentage = downloaded * 100 / total_size;
+                if percentage > last_percentage && percentage % 10 == 0 {
+                    info!("Download progress: {}%", percentage);
+                    last_percentage = percentage;
+                }
+            }
+        }
+
+        // Sync file to ensure data is written to disk
+        file.sync_all()
+            .await
+            .map_err(|e| ProviderError::StreamError(e.to_string()))?;
+
+        // Verify file size
+        if total_size > 0 {
+            let final_size = fs::metadata(&part_path).await.map(|m| m.len()).unwrap_or(0);
+            if final_size != total_size {
+                info!(
+                    "Warning: Downloaded file size ({}) doesn't match expected size ({})",
+                    final_size, total_size
+                );
+                // Continue anyway as the size might be inaccurate
+            }
+        }
+
+        // Rename part file to final file to complete the download
+        fs::rename(&part_path, model_path)
+            .await
+            .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?;
+
+        info!("Download completed successfully");
+    }
+
+    // Set executable permissions
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(model_path)
+            .await
+            .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?
+            .permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(model_path, perms)
+            .await
+            .map_err(|e| ProviderError::InitializationFailed(e.to_string()))?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
