@@ -1,28 +1,27 @@
 use std::{
     collections::HashMap,
-    ops::{Deref, DerefMut},
     sync::{
-        Mutex, MutexGuard,
+        Arc, Mutex,
         atomic::{AtomicU32, Ordering},
     },
 };
 
-/// A singleton map that manages handles to instances of type T
-pub struct HandleMap<T> {
-    contexts: Mutex<HashMap<u32, T>>,
+/// A singleton map that manages handles to instances of type T using thread-safe primitives
+pub struct HandleMap<T: Clone> {
+    contexts: Arc<Mutex<HashMap<u32, Arc<Mutex<T>>>>>,
     next_handle: AtomicU32,
 }
 
-impl<T> Default for HandleMap<T> {
+impl<T: Clone> Default for HandleMap<T> {
     fn default() -> Self {
         Self {
-            contexts: Mutex::new(HashMap::new()),
+            contexts: Arc::new(Mutex::new(HashMap::new())),
             next_handle: AtomicU32::new(1),
         }
     }
 }
 
-impl<T> HandleMap<T> {
+impl<T: Clone> HandleMap<T> {
     /// Generate a new unique handle
     pub fn generate_handle(&self) -> u32 {
         self.next_handle.fetch_add(1, Ordering::SeqCst)
@@ -31,11 +30,13 @@ impl<T> HandleMap<T> {
     /// Insert a new instance and get its handle
     pub fn insert(&self, instance: T) -> u32 {
         let handle = self.generate_handle();
+
         let mut contexts = self
             .contexts
             .lock()
             .expect("Failed to acquire contexts lock");
-        contexts.insert(handle, instance);
+
+        contexts.insert(handle, Arc::new(Mutex::new(instance)));
         handle
     }
 
@@ -45,40 +46,61 @@ impl<T> HandleMap<T> {
             .contexts
             .lock()
             .expect("Failed to acquire contexts lock");
-        contexts.remove(&handle)
+
+        contexts.remove(&handle).map(|arc_mutex| {
+            // Get the value out of the Arc<Mutex<T>>
+            let mutex = Arc::try_unwrap(arc_mutex).unwrap_or_else(|arc| {
+                // If we can't get exclusive ownership, clone the inner value
+                let guard = arc.lock().expect("Failed to acquire instance lock");
+                Mutex::new(guard.clone())
+            });
+
+            mutex.into_inner().expect("Failed to unwrap mutex")
+        })
     }
 
-    /// Access a specific instance by handle
-    pub fn get(&self, handle: u32) -> Option<InstanceGuard<T>> {
-        let guard = self
+    /// Get a clone of the Arc<Mutex<T>> for the instance with the given handle
+    pub fn get(&self, handle: u32) -> Option<Arc<Mutex<T>>> {
+        let contexts = self
             .contexts
             .lock()
             .expect("Failed to acquire contexts lock");
-        if guard.contains_key(&handle) {
-            Some(InstanceGuard { guard, handle })
-        } else {
-            None
-        }
+        contexts.get(&handle).cloned()
     }
-}
 
-/// A guard that provides safe access to a specific instance
-pub struct InstanceGuard<'a, T> {
-    guard: MutexGuard<'a, HashMap<u32, T>>,
-    handle: u32,
-}
-
-impl<T> Deref for InstanceGuard<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.guard.get(&self.handle).unwrap()
+    /// Run a function that reads the instance with the given handle
+    pub fn with_instance<F, R>(&self, handle: u32, f: F) -> Option<R>
+    where
+        F: FnOnce(&T) -> R,
+    {
+        let instance_arc = self.get(handle)?;
+        let guard = instance_arc
+            .lock()
+            .expect("Failed to acquire instance lock");
+        Some(f(&*guard))
     }
-}
 
-impl<T> DerefMut for InstanceGuard<'_, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.guard.get_mut(&self.handle).unwrap()
+    /// Run a function that modifies the instance with the given handle
+    pub fn with_instance_mut<F, R>(&self, handle: u32, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut T) -> R,
+    {
+        let instance_arc = self.get(handle)?;
+        let mut guard = instance_arc
+            .lock()
+            .expect("Failed to acquire instance lock");
+        Some(f(&mut *guard))
+    }
+
+    /// Check if a handle exists
+    #[allow(dead_code)]
+    pub fn contains(&self, handle: u32) -> bool {
+        let contexts = self
+            .contexts
+            .lock()
+            .expect("Failed to acquire contexts lock");
+
+        contexts.contains_key(&handle)
     }
 }
 
@@ -95,21 +117,28 @@ mod tests {
         let h1 = HANDLES.insert("test1".to_string());
         let h2 = HANDLES.insert("test2".to_string());
 
-        // Access instances
-        assert_eq!(&*HANDLES.get(h1).unwrap(), "test1");
-        assert_eq!(&*HANDLES.get(h2).unwrap(), "test2");
+        // Access instances with read-only function
+        HANDLES.with_instance(h1, |s| {
+            assert_eq!(s, "test1");
+        });
+
+        HANDLES.with_instance(h2, |s| {
+            assert_eq!(s, "test2");
+        });
 
         // Modify instance
-        if let Some(mut guard) = HANDLES.get(h1) {
-            *guard = "modified".to_string();
-        }
+        HANDLES.with_instance_mut(h1, |s| {
+            *s = "modified".to_string();
+        });
 
         // Verify modification
-        assert_eq!(&*HANDLES.get(h1).unwrap(), "modified");
+        HANDLES.with_instance(h1, |s| {
+            assert_eq!(s, "modified");
+        });
 
         // Remove instance
         let removed = HANDLES.remove(h1).unwrap();
         assert_eq!(removed, "modified");
-        assert!(HANDLES.get(h1).is_none());
+        assert!(!HANDLES.contains(h1));
     }
 }
