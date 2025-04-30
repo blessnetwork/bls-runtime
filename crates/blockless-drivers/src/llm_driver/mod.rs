@@ -73,16 +73,35 @@ pub async fn llm_get_model(handle: u32) -> Result<String, LlmErrorKind> {
 }
 
 pub async fn llm_set_options(handle: u32, options: &[u8]) -> Result<(), LlmErrorKind> {
-    let mut ctx = CONTEXTS.get(handle).ok_or(LlmErrorKind::ModelNotSet)?;
-    let parsed_options: LlmOptions =
-        serde_json::from_slice(options).map_err(|_| LlmErrorKind::ModelOptionsNotSet)?;
+    // Parse options first
+    let parsed_options: LlmOptions = serde_json::from_slice(options).map_err(|err| {
+        tracing::error!("Failed to parse options: {:?}", err);
+        LlmErrorKind::ModelOptionsNotSet
+    })?;
 
-    if !parsed_options.system_message.is_empty() {
-        ctx.messages.clear();
-        ctx.add_message("system", &parsed_options.system_message);
-    }
+    let system_prompt = parsed_options.system_message.clone().unwrap_or("You are a helpful assistant.".to_string());
 
-    ctx.options = parsed_options;
+    // Now update the context after the async work
+    CONTEXTS
+        .with_instance_mut(handle, move |ctx| {
+            // Clear messages and add new system prompt
+            let mut messages = ctx.messages.lock().unwrap();
+            messages.clear();
+
+            // Add system message and set tools
+            messages.push(Message {
+                role: Role::System,
+                content: system_prompt,
+            });
+
+            // Drop the messages guard
+            drop(messages);
+
+            // Sync options - required by SDK for verification
+            ctx.options = parsed_options;
+        })
+        .ok_or(LlmErrorKind::ModelNotSet)?;
+
     Ok(())
 }
 
@@ -102,21 +121,29 @@ pub async fn llm_prompt(handle: u32, prompt: &str) -> Result<(), LlmErrorKind> {
 }
 
 pub async fn llm_read_response(handle: u32) -> Result<String, LlmErrorKind> {
-    // Get all necessary data from the context before the async operation
+    // Use a block to ensure the lock is dropped before any async calls
+    // MutexGuard dropped after the block
     let (provider, messages) = {
-        let ctx = CONTEXTS.get(handle).ok_or(LlmErrorKind::ModelNotSet)?;
-        (ctx.provider.clone(), ctx.messages.clone())
+        let ctx_arc = CONTEXTS.get(handle).ok_or(LlmErrorKind::ModelNotSet)?;
+        let ctx = ctx_arc.lock().unwrap();
+        (
+            ctx.provider.clone(),
+            ctx.messages.lock().unwrap().clone(),
+        )
     };
 
-    // Perform the async chat operation
-    let response = provider
-        .chat(messages)
-        .await
-        .map_err(|_| LlmErrorKind::ModelCompletionFailed)?;
+    // Perform the async chat operation with the snapshot of data
+    let response = provider.chat(&messages).await.map_err(|err| {
+        tracing::error!("Model completion failed: {:?}", err);
+        LlmErrorKind::ModelCompletionFailed
+    })?;
 
-    // Update the context with the response
-    let mut ctx = CONTEXTS.get(handle).ok_or(LlmErrorKind::ModelNotSet)?;
-    ctx.add_message("assistant", &response.content.clone());
+    // Add the assistant message to the context
+    CONTEXTS
+        .with_instance_mut(handle, |ctx| {
+            ctx.add_message(Role::Assistant, response.content.clone());
+        })
+        .ok_or(LlmErrorKind::ModelNotSet)?;
 
     Ok(response.content)
 }
