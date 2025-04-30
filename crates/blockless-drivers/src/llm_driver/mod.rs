@@ -79,7 +79,10 @@ pub async fn llm_set_options(handle: u32, options: &[u8]) -> Result<(), LlmError
         LlmErrorKind::ModelOptionsNotSet
     })?;
 
-    let system_prompt = parsed_options.system_message.clone().unwrap_or("You are a helpful assistant.".to_string());
+    let system_prompt = parsed_options
+        .system_message
+        .clone()
+        .unwrap_or("You are a helpful assistant.".to_string());
 
     // Now update the context after the async work
     CONTEXTS
@@ -126,10 +129,7 @@ pub async fn llm_read_response(handle: u32) -> Result<String, LlmErrorKind> {
     let (provider, messages) = {
         let ctx_arc = CONTEXTS.get(handle).ok_or(LlmErrorKind::ModelNotSet)?;
         let ctx = ctx_arc.lock().unwrap();
-        (
-            ctx.provider.clone(),
-            ctx.messages.lock().unwrap().clone(),
-        )
+        (ctx.provider.clone(), ctx.messages.lock().unwrap().clone())
     };
 
     // Perform the async chat operation with the snapshot of data
@@ -155,7 +155,9 @@ pub async fn llm_close(handle: u32) -> Result<(), LlmErrorKind> {
             Ok(provider) => provider,
             Err(arc_provider) => {
                 // If we can't get exclusive ownership, log and force a clone to shutdown
-                tracing::error!("Provider has multiple references during shutdown, forcing shutdown");
+                tracing::error!(
+                    "Provider has multiple references during shutdown, forcing shutdown"
+                );
                 let mut provider_clone = (*arc_provider).clone();
                 provider_clone
                     .shutdown()
