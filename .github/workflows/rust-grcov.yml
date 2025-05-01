@@ -36,11 +36,14 @@ jobs:
         with:
           crate: grcov
           use-tool-cache: true
-      - name: grcov 
+
+      - name: Gather coverage data
         id: coverage
-        run: |
-          grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing --ignore "/*" -o coverage.info
-          echo "report=`pwd`/coverage.info" >> $GITHUB_OUTPUT
+        uses: joinhack/grcov@master
+        with:
+          coveralls-token: ${{ secrets.COVERALLS_TOKEN }}
+
+
       - name: Coveralls upload
         uses: coverallsapp/github-action@master
         with:
