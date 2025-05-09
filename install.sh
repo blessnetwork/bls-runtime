@@ -1,8 +1,12 @@
 #!/bin/bash
-
+WORkING_DIR="$(mktemp -d)"
+cd $WORkING_DIR
 # Set the installation directory to the user's bin directory
-INSTALL_DIR="$HOME/bin"
-
+INSTALL_DIR="$HOME/.blessnet/bin"
+GREEN="\033[32m"
+BRIGHT_GREEN="\033[92m"
+RED="\033[31m"
+NC="\033[0m"
 # Create the bin directory if it doesn't exist
 mkdir -p $INSTALL_DIR
 
@@ -24,25 +28,38 @@ case $ARCH in
         ;;
 esac
 
+# Check if jq is installed
+if ! command -v jq &> /dev/null; then
+    echo "jq could not be found. Please install jq to proceed."
+    exit 1
+fi
+# Check if curl is installed
+if ! command -v curl &> /dev/null; then
+    echo "curl could not be found. Please install curl to proceed."
+    exit 1
+fi
+
+bls_version=`curl -s https://api.github.com/repos/blessnetwork/bls-runtime/releases/latest|jq -r .tag_name`
+
 # Determine the download URL based on the operating system
 case $OS in
     "Linux")
         if [[ "$ARCH" == "x86_64" ]]; then
-            URL="https://github.com/blocklessnetwork/bls-runtime/releases/download/v0.4.0/blockless-runtime.linux-latest.x86_64.tar.gz"
+            URL="https://github.com/blocklessnetwork/bls-runtime/releases/download/${bls_version}/blockless-runtime.linux-latest.x86_64.tar.gz"
         elif [[ "$ARCH" == "aarch64" ]]; then
-            URL="https://github.com/blocklessnetwork/bls-runtime/releases/download/v0.4.0/blockless-runtime.linux-latest.aarch64.tar.gz"
+            URL="https://github.com/blocklessnetwork/bls-runtime/releases/download/${bls_version}/blockless-runtime.linux-latest.aarch64.tar.gz"
         fi
         ;;
     "Darwin")
         if [[ "$ARCH" == "x86_64" ]]; then
-            URL="https://github.com/blocklessnetwork/bls-runtime/releases/download/v0.4.0/blockless-runtime.macos-latest.x86_64.tar.gz"
+            URL="https://github.com/blocklessnetwork/bls-runtime/releases/download/${bls_version}/blockless-runtime.macos-latest.x86_64.tar.gz"
         elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
-            URL="https://github.com/blocklessnetwork/bls-runtime/releases/download/v0.4.0/blockless-runtime.macos-latest.aarch64.tar.gz"
+            URL="https://github.com/blocklessnetwork/bls-runtime/releases/download/${bls_version}/blockless-runtime.macos-latest.aarch64.tar.gz"
         fi
         ;;
     "WindowsNT")
         if [[ "$ARCH" == "x86_64" ]]; then
-            URL="https://github.com/blocklessnetwork/bls-runtime/releases/download/v0.4.0/blockless-runtime.windows-latest.x86_64.tar.gz"
+            URL="https://github.com/blocklessnetwork/bls-runtime/releases/download/${bls_version}/blockless-runtime.windows-latest.x86_64.tar.gz"
         fi
         ;;
     *)
@@ -52,30 +69,34 @@ case $OS in
 esac
 
 # Download the binary
-echo "Downloading Blockless Runtime from $URL..."
-curl -L $URL -o /tmp/blockless-runtime.tar.gz
-
-# Extract the downloaded tar.gz file
-echo "Extracting Blockless Runtime..."
-tar -xzf /tmp/blockless-runtime.tar.gz -C /tmp
+echo "Downloading and Extracting Blockless Runtime from $URL..."
+curl -L $URL | tar -xz 
+if [ $? -ne 0 ]; then
+    echo "Error downloading Blockless Runtime. Please check your internet connection."
+    exit 1
+fi
+# Check if the download was successful
+if [ ! -f bls-runtime ]; then
+    echo "Error: Blockless Runtime binary not found in the downloaded archive."
+    exit 1
+fi
 
 # Move the binary to the user's bin directory
 echo "Installing Blockless Runtime to $INSTALL_DIR..."
-mv /tmp/bls-runtime $INSTALL_DIR
+mv bls-runtime $INSTALL_DIR
 
 # Make sure the binary is executable
 chmod +x $INSTALL_DIR/bls-runtime
 
 # Clean up
-rm /tmp/blockless-runtime.tar.gz
+rm  -rf $WORkING_DIR
 
-# Add ~/bin to PATH if not already added
-if [[ ":$PATH:" != *":$HOME/bin:"* ]]; then
-    echo "Adding $HOME/bin to PATH in your shell profile..."
-    echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bash_profile || ~/.zshrc
-    source ~/.bash_profile || source ~/.zshrc
+# Add bin to PATH if not already added
+if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+    echo -e "${RED}Please add follow line to your shell profile...${NC}"
+    echo -e "${BRIGHT_GREEN}export PATH=$INSTALL_DIR:\$PATH${NC}"
 fi
 
 # Verify the installation
-echo "Installation complete!"
-bls-runtime --version
+echo -e "Install complete!"
+$INSTALL_DIR/bls-runtime --version
