@@ -28,10 +28,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Edit Toml
-        uses: dmikey/toml-editor@master
+        uses: blocklessnetwork/toml-editor@master
         with:
           file: "bls-runtime/Cargo.toml"
-          key: "version"
+          key: "package.version"
           value: "${{ steps.get_release.outputs.tag_name }}"
       - uses: actions-rs/toolchain@v1
         with:
