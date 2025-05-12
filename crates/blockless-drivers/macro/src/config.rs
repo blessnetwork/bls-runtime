@@ -21,7 +21,7 @@ mod kw {
     syn::custom_keyword!(link_method);
 }
 
-/// The Blockless Configure for the Witx File, use Witx genrate the code of linker abi.
+/// The Blockless Configure for the Witx File, use Witx generate the code of linker abi.
 impl BlocklessConfig {
     fn build(fields: impl Iterator<Item = BlocklessConfigField>) -> Result<Self> {
         let mut witx_confg = None;

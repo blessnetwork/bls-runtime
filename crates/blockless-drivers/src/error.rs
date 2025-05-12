@@ -20,7 +20,7 @@ impl std::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             Self::ConnectError => write!(f, "Connect Error."),
-            Self::MemoryNotExport => write!(f, "Memoery not export"),
+            Self::MemoryNotExport => write!(f, "Memory not export"),
             Self::DriverNotFound => write!(f, "Driver not found."),
             Self::DriverBadOpen => write!(f, "Driver bad open."),
             Self::BadFileDescriptor => write!(f, "Bad file descriptor."),
@@ -60,7 +60,7 @@ impl std::fmt::Display for HttpErrorKind {
         match *self {
             Self::InvalidDriver => write!(f, "Invalid Driver"),
             Self::InvalidHandle => write!(f, "Invalid Error"),
-            Self::MemoryAccessError => write!(f, "Memoery Access Error"),
+            Self::MemoryAccessError => write!(f, "Memory Access Error"),
             Self::BufferTooSmall => write!(f, "Buffer too small"),
             Self::HeaderNotFound => write!(f, "Header not found"),
             Self::Utf8Error => write!(f, "Utf8 error"),
@@ -71,7 +71,7 @@ impl std::fmt::Display for HttpErrorKind {
             Self::RequestError => write!(f, "Request url"),
             Self::RuntimeError => write!(f, "Runtime error"),
             Self::TooManySessions => write!(f, "Too many sessions"),
-            Self::PermissionDeny => write!(f, "Permision deny."),
+            Self::PermissionDeny => write!(f, "Permission deny."),
             Self::HeadersValidationError => write!(f, "Headers are malformed."),
         }
     }
@@ -103,7 +103,7 @@ impl std::fmt::Display for IpfsErrorKind {
             Self::RequestError => write!(f, "Request url"),
             Self::RuntimeError => write!(f, "Runtime error"),
             Self::TooManySessions => write!(f, "Too many sessions"),
-            Self::PermissionDeny => write!(f, "Permision deny."),
+            Self::PermissionDeny => write!(f, "Permission deny."),
         }
     }
 }
@@ -138,7 +138,7 @@ impl std::fmt::Display for S3ErrorKind {
             Self::RequestError => write!(f, "Request url"),
             Self::RuntimeError => write!(f, "Runtime error"),
             Self::TooManySessions => write!(f, "Too many sessions"),
-            Self::PermissionDeny => write!(f, "Permision deny."),
+            Self::PermissionDeny => write!(f, "Permission deny."),
         }
     }
 }

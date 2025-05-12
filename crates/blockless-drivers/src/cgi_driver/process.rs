@@ -232,7 +232,7 @@ async fn get_file_meta(file_path: &str) -> anyhow::Result<Option<ExtensionMeta>>
     command.args(["--ext_verify"]);
     let child = command.output().await?;
     let val = std::str::from_utf8(&child.stdout[..])?;
-    //parse output json like {"alias":"xxx", "md5":"xxxx", "desciption":"xxxxx", "is_cgi": true}
+    //parse output json like {"alias":"xxx", "md5":"xxxx", "description":"xxxxx", "is_cgi": true}
     let json = json::parse(val.trim())?;
     let is_cgi = match json["is_cgi"].as_bool() {
         Some(b) => b,
@@ -339,7 +339,7 @@ async fn cgi_directory_list_extensions(path: &str) -> Result<Vec<ExtensionMeta>,
     Ok(metas)
 }
 
-/// The CGI must support "--ext_verify" paramter, the runtime will be call with the parameter.
+/// The CGI must support "--ext_verify" parameter, the runtime will be call with the parameter.
 pub async fn cgi_directory_list_exec(path: &str) -> Result<String, CgiErrorKind> {
     let exts = cgi_directory_list_extensions(path).await?;
     let exts: Vec<JsonValue> = exts
@@ -400,7 +400,7 @@ mod test {
                 .mode(0o700)
                 .open(test_extension)
                 .unwrap();
-            //The CGI must support "--ext_verify" paramter
+            //The CGI must support "--ext_verify" parameter
             let script = format!(
                 r#"#!/usr/bin/env sh 
             echo '{{"alias":"{}", "description":"eeeeee", "is_cgi":true}}'"#,

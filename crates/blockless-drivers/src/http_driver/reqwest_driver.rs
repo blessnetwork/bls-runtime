@@ -168,7 +168,7 @@ async fn stream_read(state: &mut StreamState, dest: &mut [u8]) -> usize {
                 let mut buffer = match state.stream.next().await {
                     Some(Ok(s)) => s,
                     Some(Err(e)) => {
-                        debug!("error get messgae {}", e);
+                        debug!("error get message {}", e);
                         return readn;
                     }
                     None => return readn,
