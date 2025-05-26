@@ -232,9 +232,16 @@ impl FromStr for Models {
                 Ok(Models::Gemma29BInstruct(Some("q4f16_1".to_string())))
             }
             // Model must be a valid URL
-            _ => url::Url::parse(s)
-                .map(Models::Url)
-                .map_err(|_| format!("Invalid model url: {}", s)),
+            _ => {
+                let url =
+                    url::Url::parse(s).map_err(|_| format!("Invalid model name or URL: {}", s))?;
+
+                // Apply security validation to custom URLs
+                let security_config = SecurityConfig::default();
+                security_config.validate_model_url(&url)?;
+
+                Ok(Models::Url(url))
+            }
         }
     }
 }
