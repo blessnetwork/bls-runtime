@@ -287,7 +287,9 @@ mod tests {
 
         // Set model and verify
         tracing::info!("Setting up model...");
-        let handle = llm_set_model("Llama-3.2-1B-Instruct").await.unwrap();
+        let handle = llm_set_model("Llama-3.2-1B-Instruct", |_| true)
+            .await
+            .unwrap();
         let model = llm_get_model(handle).await.unwrap();
         assert_eq!(model, "Llama-3.2-1B-Instruct");
 
@@ -353,7 +355,7 @@ mod tests {
 
         // Set model and verify
         tracing::info!("Setting up model...");
-        let handle = llm_set_model("https://huggingface.co/Mozilla/Meta-Llama-3.1-8B-Instruct-llamafile/resolve/main/Meta-Llama-3.1-8B-Instruct.Q6_K.llamafile").await.unwrap();
+        let handle = llm_set_model("https://huggingface.co/Mozilla/Meta-Llama-3.1-8B-Instruct-llamafile/resolve/main/Meta-Llama-3.1-8B-Instruct.Q6_K.llamafile", |_| true).await.unwrap();
         let model = llm_get_model(handle).await.unwrap();
         assert_eq!(
             model,
@@ -381,5 +383,40 @@ mod tests {
         // Clean up
         tracing::debug!("Cleaning up...");
         llm_close(handle).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_llm_url_permission_check() {
+        let _ = FmtSubscriber::builder()
+            .with_max_level(tracing::Level::DEBUG)
+            .with_test_writer()
+            .try_init();
+
+        // Test with permission checker that allows all URLs
+        let allow_all_checker = |_: &url::Url| true;
+        let handle = llm_set_model(
+            "https://huggingface.co/Mozilla/Llama-3.2-1B-Instruct-llamafile/resolve/main/Llama-3.2-1B-Instruct.Q6_K.llamafile",
+            allow_all_checker
+        ).await;
+        assert!(handle.is_ok());
+        if let Ok(handle) = handle {
+            llm_close(handle).await.unwrap();
+        }
+
+        // Test with permission checker that denies all URLs
+        let deny_all_checker = |_: &url::Url| false;
+        let handle = llm_set_model(
+            "https://huggingface.co/Mozilla/Llama-3.2-1B-Instruct-llamafile/resolve/main/Llama-3.2-1B-Instruct.Q6_K.llamafile",
+            deny_all_checker
+        ).await;
+        assert!(matches!(handle, Err(LlmErrorKind::PermissionDeny)));
+
+        // Test with known model (should not trigger permission check)
+        let deny_all_checker = |_: &url::Url| false;
+        let handle = llm_set_model("Llama-3.2-1B-Instruct", deny_all_checker).await;
+        assert!(handle.is_ok());
+        if let Ok(handle) = handle {
+            llm_close(handle).await.unwrap();
+        }
     }
 }
