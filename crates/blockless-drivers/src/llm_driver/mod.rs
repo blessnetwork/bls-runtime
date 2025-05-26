@@ -65,9 +65,20 @@ impl<P: LLMProvider + Clone> LlmContext<P> {
     }
 }
 
-pub async fn llm_set_model(model: &str) -> Result<u32, LlmErrorKind> {
+pub async fn llm_set_model<F>(model: &str, url_permission_checker: F) -> Result<u32, LlmErrorKind>
+where
+    F: Fn(&url::Url) -> bool,
+{
     // Parse model string to Models
     let supported_model: Models = model.parse().map_err(|_| LlmErrorKind::ModelNotSupported)?;
+
+    // Check URL permissions for Models::Url variant
+    if let Models::Url(ref url) = supported_model {
+        if !url_permission_checker(url) {
+            tracing::error!("Permission denied for model URL: {}", url);
+            return Err(LlmErrorKind::PermissionDeny);
+        }
+    }
 
     // Create provider and context
     let provider = LlamafileProvider::new(supported_model);

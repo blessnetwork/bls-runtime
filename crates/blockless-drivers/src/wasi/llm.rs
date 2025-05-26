@@ -33,6 +33,7 @@ impl From<LlmErrorKind> for types::LlmError {
             LlmErrorKind::Utf8Error => LlmError::Utf8Error,
             LlmErrorKind::RuntimeError => LlmError::RuntimeError,
             LlmErrorKind::MCPFunctionCallError => LlmError::McpFunctionCallError,
+            LlmErrorKind::PermissionDeny => LlmError::PermissionDeny,
         }
     }
 }
@@ -60,7 +61,11 @@ impl blockless_llm::BlocklessLlm for WasiCtx {
                 LlmErrorKind::Utf8Error
             })?
             .unwrap();
-        let fd = llm_driver::llm_set_model(model).await?;
+        // Use a closure that captures self to check URL permissions
+        let fd = llm_driver::llm_set_model(model, |url: &url::Url| -> bool {
+            self.check_url_permissions(url, "llm_set_model")
+        })
+        .await?;
         memory
             .write(handle, fd)
             .map_err(|_| LlmErrorKind::RuntimeError)?;

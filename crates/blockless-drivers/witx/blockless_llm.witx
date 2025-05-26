@@ -20,6 +20,8 @@
     $runtime_error
     ;;; MCP function call error
     $mcp_function_call_error
+    ;;; Permission denied
+    $permission_deny
   )
 )
 
