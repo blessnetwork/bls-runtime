@@ -1,6 +1,108 @@
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
+pub struct SecurityConfig {
+    pub allowed_domains: Vec<String>,
+    pub require_https: bool,
+    pub allowed_file_extensions: Vec<String>,
+}
+
+impl Default for SecurityConfig {
+    fn default() -> Self {
+        Self {
+            allowed_domains: vec![
+                "huggingface.co".to_string(),
+                "github.com".to_string(),
+                "releases.github.com".to_string(),
+            ],
+            require_https: true,
+            allowed_file_extensions: vec![".llamafile".to_string()],
+        }
+    }
+}
+
+impl SecurityConfig {
+    pub fn validate_model_url(&self, url: &url::Url) -> Result<(), String> {
+        // Validate HTTPS requirement
+        if self.require_https && url.scheme() != "https" {
+            return Err("Only HTTPS URLs are allowed for security".to_string());
+        }
+
+        // Validate domain allowlist
+        let host = url.host_str().ok_or("Invalid URL: no host")?;
+        if !self
+            .allowed_domains
+            .iter()
+            .any(|domain| host == domain || host.ends_with(&format!(".{}", domain)))
+        {
+            return Err(format!(
+                "Untrusted domain: {}. Allowed domains: {:?}",
+                host, self.allowed_domains
+            ));
+        }
+
+        // Check for suspicious paths that might indicate path traversal attempts
+        let path = url.path();
+        if path.contains("..") {
+            return Err("Path contains suspicious '..' segments".to_string());
+        }
+
+        // Extract filename from URL path
+        let filename = url
+            .path_segments()
+            .and_then(|segments| segments.last())
+            .ok_or("Invalid URL: no filename in path")?;
+
+        // Validate filename
+        self.validate_filename(filename)?;
+
+        // Additional security: ensure the path looks like a reasonable model path
+        if path.starts_with("/etc/")
+            || path.starts_with("/windows/")
+            || path.starts_with("/system32/")
+        {
+            return Err("Suspicious system path detected".to_string());
+        }
+
+        Ok(())
+    }
+
+    pub fn validate_filename(&self, filename: &str) -> Result<(), String> {
+        // Check for path traversal attempts
+        if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+            return Err("Invalid filename: path traversal detected".to_string());
+        }
+
+        // Validate file extension
+        if !self
+            .allowed_file_extensions
+            .iter()
+            .any(|ext| filename.ends_with(ext))
+        {
+            return Err(format!(
+                "Invalid file extension. Allowed extensions: {:?}",
+                self.allowed_file_extensions
+            ));
+        }
+
+        // Additional security checks
+        if filename.is_empty() {
+            return Err("Filename cannot be empty".to_string());
+        }
+
+        // Check for control characters or other suspicious characters
+        if filename
+            .chars()
+            .any(|c| c.is_control() || c.is_ascii_control())
+        {
+            return Err("Filename contains invalid control characters".to_string());
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Models {
     Llama321BInstruct(Option<String>),
     Llama323BInstruct(Option<String>),
