@@ -215,4 +215,5 @@ pub enum LlmErrorKind {
     Utf8Error,                 // 7
     RuntimeError,              // 8
     MCPFunctionCallError,      // 9
+    PermissionDeny,            // 10
 }
