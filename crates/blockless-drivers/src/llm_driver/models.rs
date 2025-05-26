@@ -260,3 +260,105 @@ impl std::fmt::Display for Models {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_known_models() {
+        // Known models should work without security validation
+        assert!(Models::from_str("Llama-3.2-1B-Instruct").is_ok());
+        assert!(Models::from_str("Llama-3.2-3B-Instruct").is_ok());
+        assert!(Models::from_str("Mistral-7B-Instruct-v0.3").is_ok());
+        assert!(Models::from_str("Mixtral-8x7B-Instruct-v0.1").is_ok());
+        assert!(Models::from_str("gemma-2-2b-it").is_ok());
+
+        // Quantized variants should also work
+        assert!(Models::from_str("Llama-3.2-1B-Instruct-Q6_K").is_ok());
+        assert!(Models::from_str("gemma-2-2b-it-q4f16_1").is_ok());
+    }
+
+    #[test]
+    fn test_valid_custom_urls() {
+        // Valid custom URL should work
+        let valid_url = "https://huggingface.co/Mozilla/Meta-Llama-3.1-8B-Instruct-llamafile/resolve/main/Meta-Llama-3.1-8B-Instruct.Q6_K.llamafile?download=true";
+        let model = Models::from_str(valid_url).expect("Should parse valid URL");
+
+        // Test model_file() extraction
+        let file_name = model.model_file();
+        assert_eq!(file_name, "Meta-Llama-3.1-8B-Instruct.Q6_K.llamafile");
+
+        // Test subdomain support
+        assert!(Models::from_str("https://files.huggingface.co/model.llamafile").is_ok());
+
+        // Test GitHub domain
+        assert!(
+            Models::from_str("https://github.com/user/repo/releases/download/v1.0/model.llamafile")
+                .is_ok()
+        );
+
+        // Test path normalization (should pass after normalization)
+        assert!(
+            Models::from_str("https://huggingface.co/model/../../../malicious.llamafile").is_ok()
+        );
+    }
+
+    #[test]
+    fn test_security_validations() {
+        let config = SecurityConfig::default();
+
+        // Test HTTPS requirement
+        let http_url = url::Url::parse("http://huggingface.co/model.llamafile").unwrap();
+        assert!(config.validate_model_url(&http_url).is_err());
+        assert!(
+            config
+                .validate_model_url(&http_url)
+                .unwrap_err()
+                .contains("HTTPS")
+        );
+
+        // Test domain allowlisting
+        let disallowed_url = url::Url::parse("https://malicious.com/model.llamafile").unwrap();
+        assert!(config.validate_model_url(&disallowed_url).is_err());
+        assert!(
+            config
+                .validate_model_url(&disallowed_url)
+                .unwrap_err()
+                .contains("Untrusted domain")
+        );
+
+        // Test file extension validation
+        let invalid_ext_url = url::Url::parse("https://huggingface.co/malicious.exe").unwrap();
+        assert!(config.validate_model_url(&invalid_ext_url).is_err());
+        assert!(
+            config
+                .validate_model_url(&invalid_ext_url)
+                .unwrap_err()
+                .contains("Invalid file extension")
+        );
+
+        // Test filename security
+        assert!(config.validate_filename("model.llamafile").is_ok());
+        assert!(config.validate_filename("../model.llamafile").is_err());
+        assert!(config.validate_filename("path/to/model.llamafile").is_err());
+        assert!(config.validate_filename("").is_err());
+        assert!(config.validate_filename("model\x00.llamafile").is_err());
+    }
+
+    #[test]
+    fn test_invalid_custom_urls() {
+        // HTTP URL should fail
+        assert!(Models::from_str("http://huggingface.co/model.llamafile").is_err());
+
+        // Untrusted domain should fail
+        assert!(Models::from_str("https://malicious.com/model.llamafile").is_err());
+
+        // Invalid extension should fail
+        assert!(Models::from_str("https://huggingface.co/malicious.exe").is_err());
+
+        // URLs that normalize to invalid files should fail
+        assert!(Models::from_str("https://huggingface.co/../../../etc/passwd").is_err());
+        assert!(Models::from_str("https://huggingface.co/windows/system32/cmd.exe").is_err());
+    }
+}
