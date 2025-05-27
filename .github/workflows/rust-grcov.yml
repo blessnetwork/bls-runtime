@@ -25,7 +25,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all
+          args: --all -- --test-threads=1
         env:
           CARGO_INCREMENTAL: 0
           LLVM_PROFILE_FILE: "run-%m.profraw"
