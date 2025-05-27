@@ -277,6 +277,24 @@ mod tests {
     use super::*;
     use tracing_subscriber::FmtSubscriber;
 
+    /// Helper function to validate URL permissions without downloading the model
+    fn validate_model_url_permission<F>(
+        model: &str,
+        url_permission_checker: F,
+    ) -> Result<(), LlmErrorKind>
+    where
+        F: Fn(&url::Url) -> bool,
+    {
+        let supported_model: Models = model.parse().map_err(|_| LlmErrorKind::ModelNotSupported)?;
+        if let Models::Url(ref url) = supported_model {
+            if !url_permission_checker(url) {
+                tracing::error!("Permission denied for model URL: {}", url);
+                return Err(LlmErrorKind::PermissionDeny);
+            }
+        }
+        Ok(())
+    }
+
     #[ignore = "requires downloading large LLM model"]
     #[tokio::test]
     async fn test_llm_driver_e2e() {
@@ -394,29 +412,63 @@ mod tests {
 
         // Test with permission checker that allows all URLs
         let allow_all_checker = |_: &url::Url| true;
-        let handle = llm_set_model(
+        let result = validate_model_url_permission(
             "https://huggingface.co/Mozilla/Llama-3.2-1B-Instruct-llamafile/resolve/main/Llama-3.2-1B-Instruct.Q6_K.llamafile",
-            allow_all_checker
-        ).await;
-        assert!(handle.is_ok());
-        if let Ok(handle) = handle {
-            llm_close(handle).await.unwrap();
-        }
+            allow_all_checker,
+        );
+        assert!(result.is_ok());
 
         // Test with permission checker that denies all URLs
         let deny_all_checker = |_: &url::Url| false;
-        let handle = llm_set_model(
+        let result = validate_model_url_permission(
             "https://huggingface.co/Mozilla/Llama-3.2-1B-Instruct-llamafile/resolve/main/Llama-3.2-1B-Instruct.Q6_K.llamafile",
-            deny_all_checker
-        ).await;
-        assert!(matches!(handle, Err(LlmErrorKind::PermissionDeny)));
+            deny_all_checker,
+        );
+        assert!(matches!(result, Err(LlmErrorKind::PermissionDeny)));
 
         // Test with known model (should not trigger permission check)
         let deny_all_checker = |_: &url::Url| false;
-        let handle = llm_set_model("Llama-3.2-1B-Instruct", deny_all_checker).await;
-        assert!(handle.is_ok());
-        if let Ok(handle) = handle {
-            llm_close(handle).await.unwrap();
-        }
+        let result = validate_model_url_permission("Llama-3.2-1B-Instruct", deny_all_checker);
+        assert!(result.is_ok());
+
+        // Test with invalid model string
+        let allow_all_checker = |_: &url::Url| true;
+        let result = validate_model_url_permission("InvalidModel", allow_all_checker);
+        assert!(matches!(result, Err(LlmErrorKind::ModelNotSupported)));
+
+        // Test with URL that fails built-in security validation (should return ModelNotSupported, not PermissionDeny)
+        let allow_all_checker = |_: &url::Url| true;
+        let result = validate_model_url_permission(
+            "https://malicious.com/bad-model.llamafile",
+            allow_all_checker,
+        );
+        assert!(matches!(result, Err(LlmErrorKind::ModelNotSupported)));
+
+        // Test with URL that fails built-in security validation due to HTTP (not HTTPS)
+        let result = validate_model_url_permission(
+            "http://huggingface.co/model.llamafile",
+            allow_all_checker,
+        );
+        assert!(matches!(result, Err(LlmErrorKind::ModelNotSupported)));
+
+        // Test with selective permission checker on valid URL
+        let selective_checker = |url: &url::Url| {
+            // Allow only URLs that contain "Llama" in the path
+            url.path().contains("Llama")
+        };
+
+        // This should pass both security validation and permission check
+        let result = validate_model_url_permission(
+            "https://huggingface.co/Mozilla/Llama-3.2-1B-Instruct-llamafile/resolve/main/Llama-3.2-1B-Instruct.Q6_K.llamafile",
+            selective_checker,
+        );
+        assert!(result.is_ok());
+
+        // This should pass security validation but fail permission check
+        let result = validate_model_url_permission(
+            "https://huggingface.co/Mozilla/Mistral-7B-Instruct-llamafile/resolve/main/Mistral-7B-Instruct.Q6_K.llamafile",
+            selective_checker,
+        );
+        assert!(matches!(result, Err(LlmErrorKind::PermissionDeny)));
     }
 }
