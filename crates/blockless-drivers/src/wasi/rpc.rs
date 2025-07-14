@@ -89,8 +89,8 @@ impl bless::Bless for WasiCtx {
         let response = handle_rpc_request(request).await;
 
         // Serialize response directly to bytes
-        let response_bytes = serde_json::to_vec(&response)
-            .map_err(|_| BlocklessRpcErrorKind::InternalError)?;
+        let response_bytes =
+            serde_json::to_vec(&response).map_err(|_| BlocklessRpcErrorKind::InternalError)?;
 
         // Check if response fits in buffer
         let response_len = response_bytes.len() as u32;
@@ -109,16 +109,14 @@ impl bless::Bless for WasiCtx {
 
 async fn handle_rpc_request(request: JsonRpcRequest) -> JsonRpcResponse {
     let id = request.id;
-    
+
     match request.method.as_str() {
-        "ping" => {
-            JsonRpcResponse {
-                jsonrpc: "2.0".to_string(),
-                result: Some(serde_json::json!("pong")),
-                error: None,
-                id,
-            }
-        }
+        "ping" => JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            result: Some(serde_json::json!("pong")),
+            error: None,
+            id,
+        },
         "echo" => {
             let params = request.params.unwrap_or(serde_json::Value::Null);
             JsonRpcResponse {
@@ -128,34 +126,28 @@ async fn handle_rpc_request(request: JsonRpcRequest) -> JsonRpcResponse {
                 id,
             }
         }
-        "version" => {
-            JsonRpcResponse {
-                jsonrpc: "2.0".to_string(),
-                result: Some(serde_json::json!({
-                    "runtime": "bls-runtime",
-                    "version": env!("CARGO_PKG_VERSION"),
-                    "rpc_version": "2.0"
+        "version" => JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            result: Some(serde_json::json!({
+                "runtime": "bls-runtime",
+                "version": env!("CARGO_PKG_VERSION"),
+                "rpc_version": "2.0"
+            })),
+            error: None,
+            id,
+        },
+        "http.request" => crate::handlers::http::handle_http_request(request.params, id).await,
+        _ => JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            result: None,
+            error: Some(JsonRpcError {
+                code: -32601,
+                message: "Method not found".to_string(),
+                data: Some(serde_json::json!({
+                    "method": request.method
                 })),
-                error: None,
-                id,
-            }
-        }
-        "http.request" => {
-            crate::handlers::http::handle_http_request(request.params, id).await
-        }
-        _ => {
-            JsonRpcResponse {
-                jsonrpc: "2.0".to_string(),
-                result: None,
-                error: Some(JsonRpcError {
-                    code: -32601,
-                    message: "Method not found".to_string(),
-                    data: Some(serde_json::json!({
-                        "method": request.method
-                    })),
-                }),
-                id,
-            }
-        }
+            }),
+            id,
+        },
     }
 }
