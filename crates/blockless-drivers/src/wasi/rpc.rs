@@ -140,6 +140,9 @@ async fn handle_rpc_request(request: JsonRpcRequest) -> JsonRpcResponse {
                 id,
             }
         }
+        "http.request" => {
+            crate::handlers::http::handle_http_request(request.params, id).await
+        }
         _ => {
             JsonRpcResponse {
                 jsonrpc: "2.0".to_string(),
