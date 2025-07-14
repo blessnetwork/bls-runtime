@@ -1,11 +1,9 @@
 use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::str::FromStr;
-use std::time::Duration;
+use std::{collections::HashMap, str::FromStr, time::Duration};
 
 // Import RPC types from parent module
-use crate::wasi::rpc::{JsonRpcError, JsonRpcResponse};
+use crate::wasi::rpc::{JsonRpcError, JsonRpcResponse, RPC_VERSION};
 
 // HTTP request structures matching the SDK
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,7 +75,7 @@ pub async fn handle_http_request(params: Option<serde_json::Value>, id: u32) -> 
             Ok(req) => req,
             Err(e) => {
                 return JsonRpcResponse {
-                    jsonrpc: "2.0".to_string(),
+                    jsonrpc: RPC_VERSION.to_string(),
                     result: None,
                     error: Some(JsonRpcError {
                         code: -32602,
@@ -92,7 +90,7 @@ pub async fn handle_http_request(params: Option<serde_json::Value>, id: u32) -> 
         },
         None => {
             return JsonRpcResponse {
-                jsonrpc: "2.0".to_string(),
+                jsonrpc: RPC_VERSION.to_string(),
                 result: None,
                 error: Some(JsonRpcError {
                     code: -32602,
@@ -109,8 +107,24 @@ pub async fn handle_http_request(params: Option<serde_json::Value>, id: u32) -> 
     // Execute the HTTP request using the http_v2 driver
     let result = execute_http_request(http_request).await;
     JsonRpcResponse {
-        jsonrpc: "2.0".to_string(),
-        result: Some(serde_json::to_value(result).unwrap()),
+        jsonrpc: RPC_VERSION.to_string(),
+        result: match serde_json::to_value(result) {
+            Ok(value) => Some(value),
+            Err(e) => {
+                return JsonRpcResponse {
+                    jsonrpc: RPC_VERSION.to_string(),
+                    result: None,
+                    error: Some(JsonRpcError {
+                        code: -32603,
+                        message: "Internal error".to_string(),
+                        data: Some(serde_json::json!({
+                            "error": format!("Failed to serialize result: {}", e)
+                        })),
+                    }),
+                    id,
+                };
+            }
+        },
         error: None,
         id,
     }

@@ -10,6 +10,8 @@ wiggle::from_witx!({
     async: *,
 });
 
+pub const RPC_VERSION: &str = "2.0";
+
 // JSON-RPC 2.0 structures
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JsonRpcRequest {
@@ -112,7 +114,7 @@ async fn handle_rpc_request(request: JsonRpcRequest) -> JsonRpcResponse {
 
     match request.method.as_str() {
         "ping" => JsonRpcResponse {
-            jsonrpc: "2.0".to_string(),
+            jsonrpc: RPC_VERSION.to_string(),
             result: Some(serde_json::json!("pong")),
             error: None,
             id,
@@ -120,14 +122,14 @@ async fn handle_rpc_request(request: JsonRpcRequest) -> JsonRpcResponse {
         "echo" => {
             let params = request.params.unwrap_or(serde_json::Value::Null);
             JsonRpcResponse {
-                jsonrpc: "2.0".to_string(),
+                jsonrpc: RPC_VERSION.to_string(),
                 result: Some(params),
                 error: None,
                 id,
             }
         }
         "version" => JsonRpcResponse {
-            jsonrpc: "2.0".to_string(),
+            jsonrpc: RPC_VERSION.to_string(),
             result: Some(serde_json::json!({
                 "runtime": "bls-runtime",
                 "version": env!("CARGO_PKG_VERSION"),
@@ -138,7 +140,7 @@ async fn handle_rpc_request(request: JsonRpcRequest) -> JsonRpcResponse {
         },
         "http.request" => crate::handlers::http::handle_http_request(request.params, id).await,
         _ => JsonRpcResponse {
-            jsonrpc: "2.0".to_string(),
+            jsonrpc: RPC_VERSION.to_string(),
             result: None,
             error: Some(JsonRpcError {
                 code: -32601,
