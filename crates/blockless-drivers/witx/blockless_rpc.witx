@@ -1,0 +1,30 @@
+(typename $blockless_rpc_error
+  (enum (@witx tag u16)
+    ;;; Success
+    $success
+    ;;; Invalid JSON format
+    $invalid_json
+    ;;; Method not found
+    $method_not_found
+    ;;; Invalid parameters
+    $invalid_params
+    ;;; Internal error
+    $internal_error
+    ;;; Buffer too small
+    $buffer_too_small
+  )
+)
+
+;;; Number of bytes 
+(typename $num_bytes u32)
+
+(module $bless
+    
+    (@interface func (export "rpc_call")
+        (param $request_buf (@witx pointer u8))
+        (param $request_len u32)
+        (param $response_buf (@witx pointer u8))
+        (param $response_max_len u32)
+        (result $error (expected $num_bytes (error $blockless_rpc_error)))
+    )
+)

@@ -10,6 +10,7 @@ pub mod read_ext;
 pub mod s3_driver;
 pub mod tcp_driver;
 pub mod wasi;
+pub mod rpc_driver;
 use blockless_multiaddr as multiaddr;
 pub use cdylib_driver::CdylibDriver;
 pub use error::*;

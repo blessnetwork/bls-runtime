@@ -217,3 +217,26 @@ pub enum LlmErrorKind {
     MCPFunctionCallError,      // 9
     PermissionDeny,            // 10
 }
+
+#[derive(Debug)]
+pub enum BlocklessRpcErrorKind {
+    InvalidJson,
+    MethodNotFound,
+    InvalidParams,
+    InternalError,
+    BufferTooSmall,
+}
+
+impl std::error::Error for BlocklessRpcErrorKind {}
+
+impl std::fmt::Display for BlocklessRpcErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Self::InvalidJson => write!(f, "Invalid JSON format"),
+            Self::MethodNotFound => write!(f, "Method not found"),
+            Self::InvalidParams => write!(f, "Invalid parameters"),
+            Self::InternalError => write!(f, "Internal error"),
+            Self::BufferTooSmall => write!(f, "Buffer too small"),
+        }
+    }
+}

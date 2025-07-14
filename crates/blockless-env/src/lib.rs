@@ -48,3 +48,9 @@ linker_integration!({
     target: blockless_drivers::wasi::llm,
     link_method: "add_llm_to_linker",
 });
+
+linker_integration!({
+    witx: ["$BLOCKLESS_DRIVERS_ROOT/witx/blockless_rpc.witx"],
+    target: blockless_drivers::wasi::rpc,
+    link_method: "add_bless_to_linker",
+});
