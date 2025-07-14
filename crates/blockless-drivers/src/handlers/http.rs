@@ -117,14 +117,14 @@ pub async fn handle_http_request(params: Option<serde_json::Value>, id: u32) -> 
 }
 
 pub async fn execute_http_request(request: HttpRpcRequest) -> HttpResult {
-    println!("=== HTTP Request via RPC ===");
-    println!("URL: {}", request.url);
-    println!("Method: {:?}", request.options.method);
-    println!("Headers: {:?}", request.options.headers);
-    println!("Body: {:?}", request.options.body);
-    println!("Timeout: {:?}", request.options.timeout);
-    println!("Query Params: {:?}", request.options.query_params);
-    println!("============================");
+    log::trace!("=== HTTP Request via RPC ===");
+    log::trace!("URL: {}", request.url);
+    log::trace!("Method: {:?}", request.options.method);
+    log::trace!("Headers: {:?}", request.options.headers);
+    log::trace!("Body: {:?}", request.options.body);
+    log::trace!("Timeout: {:?}", request.options.timeout);
+    log::trace!("Query Params: {:?}", request.options.query_params);
+    log::trace!("============================");
 
     let result = async {
         // Create HTTP client with timeout
