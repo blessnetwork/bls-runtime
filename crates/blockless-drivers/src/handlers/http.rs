@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 // Import RPC types from parent module
-use crate::wasi::rpc::{JsonRpcResponse, JsonRpcError};
+use crate::wasi::rpc::{JsonRpcError, JsonRpcResponse};
 
 // HTTP request structures matching the SDK
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,7 +105,7 @@ pub async fn handle_http_request(params: Option<serde_json::Value>, id: u32) -> 
             };
         }
     };
-    
+
     // Execute the HTTP request using the http_v2 driver
     let result = execute_http_request(http_request).await;
     JsonRpcResponse {
@@ -129,9 +129,7 @@ pub async fn execute_http_request(request: HttpRpcRequest) -> HttpResult {
     let result = async {
         // Create HTTP client with timeout
         let timeout = Duration::from_millis(request.options.timeout.unwrap_or(30000) as u64);
-        let client = Client::builder()
-            .timeout(timeout)
-            .build()?;
+        let client = Client::builder().timeout(timeout).build()?;
 
         // Parse HTTP method
         let method = request.options.method.as_deref().unwrap_or("GET");
@@ -177,7 +175,11 @@ pub async fn execute_http_request(request: HttpRpcRequest) -> HttpResult {
                             MultipartValue::Text(text) => {
                                 form = form.text(field.name.clone(), text.clone());
                             }
-                            MultipartValue::Binary { data, filename, content_type } => {
+                            MultipartValue::Binary {
+                                data,
+                                filename,
+                                content_type,
+                            } => {
                                 let mut part = reqwest::multipart::Part::bytes(data.clone());
                                 if let Some(filename) = filename {
                                     part = part.file_name(filename.clone());
@@ -216,7 +218,8 @@ pub async fn execute_http_request(request: HttpRpcRequest) -> HttpResult {
             body,
             url: final_url,
         })
-    }.await;
+    }
+    .await;
 
     match result {
         Ok(response) => HttpResult {

@@ -2,6 +2,7 @@
 mod cdylib_driver;
 pub mod cgi_driver;
 pub mod error;
+pub mod handlers;
 pub mod http_driver;
 pub mod ipfs_driver;
 pub mod llm_driver;
@@ -10,7 +11,6 @@ pub mod read_ext;
 pub mod s3_driver;
 pub mod tcp_driver;
 pub mod wasi;
-pub mod handlers;
 use blockless_multiaddr as multiaddr;
 pub use cdylib_driver::CdylibDriver;
 pub use error::*;
