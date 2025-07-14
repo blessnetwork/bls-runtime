@@ -657,6 +657,7 @@ impl BlocklessRunner {
         add_to_linker!(blockless_env::add_memory_to_linker);
         add_to_linker!(blockless_env::add_cgi_to_linker);
         add_to_linker!(blockless_env::add_socket_to_linker);
+        add_to_linker!(blockless_env::add_bless_to_linker);
         wasi_common::sync::add_to_linker(linker, |host| host.preview1_ctx.as_mut().unwrap())
             .unwrap();
     }

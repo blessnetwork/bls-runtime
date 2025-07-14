@@ -5,6 +5,7 @@ pub mod http;
 pub mod ipfs;
 pub mod llm;
 pub mod memory;
+pub mod rpc;
 pub mod s3;
 pub mod socket;
 use crate::ErrorKind;
