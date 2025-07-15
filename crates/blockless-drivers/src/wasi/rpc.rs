@@ -39,6 +39,17 @@ pub struct JsonRpcError {
     pub data: Option<serde_json::Value>,
 }
 
+// https://www.jsonrpc.org/specification#error_object
+#[derive(Debug, Clone, Copy)]
+#[repr(i32)]
+pub enum JsonRpcErrorCode {
+    ParseError = -32700,
+    InvalidRequest = -32600,
+    MethodNotFound = -32601,
+    InvalidParams = -32602,
+    InternalError = -32603,
+}
+
 impl types::UserErrorConversion for WasiCtx {
     fn blockless_rpc_error_from_blockless_rpc_error_kind(
         &mut self,
@@ -143,7 +154,7 @@ async fn handle_rpc_request(request: JsonRpcRequest) -> JsonRpcResponse {
             jsonrpc: RPC_VERSION.to_string(),
             result: None,
             error: Some(JsonRpcError {
-                code: -32601,
+                code: JsonRpcErrorCode::MethodNotFound as i32,
                 message: "Method not found".to_string(),
                 data: Some(serde_json::json!({
                     "method": request.method

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr, time::Duration};
 
 // Import RPC types from parent module
-use crate::wasi::rpc::{JsonRpcError, JsonRpcResponse, RPC_VERSION};
+use crate::wasi::rpc::{JsonRpcError, JsonRpcErrorCode, JsonRpcResponse, RPC_VERSION};
 
 // HTTP request structures matching the SDK
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,7 +93,7 @@ pub async fn handle_http_request(params: Option<serde_json::Value>, id: u32) -> 
                 jsonrpc: RPC_VERSION.to_string(),
                 result: None,
                 error: Some(JsonRpcError {
-                    code: -32602,
+                    code: JsonRpcErrorCode::InvalidParams as i32,
                     message: "Invalid params".to_string(),
                     data: Some(serde_json::json!({
                         "error": "Missing HTTP request parameters"
@@ -115,7 +115,7 @@ pub async fn handle_http_request(params: Option<serde_json::Value>, id: u32) -> 
                     jsonrpc: RPC_VERSION.to_string(),
                     result: None,
                     error: Some(JsonRpcError {
-                        code: -32603,
+                        code: JsonRpcErrorCode::InternalError as i32,
                         message: "Internal error".to_string(),
                         data: Some(serde_json::json!({
                             "error": format!("Failed to serialize result: {}", e)
