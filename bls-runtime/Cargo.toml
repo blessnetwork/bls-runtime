@@ -1,6 +1,6 @@
 [package]
 name = "bls-runtime"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Join.G"]
 description = "command line example"
 keywords = ["webassembly", "wasm"]
